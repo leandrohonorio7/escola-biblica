@@ -1,8 +1,8 @@
 using AutoMapper;
 using EscolaBiblica.Application.Common.Exceptions;
+using EscolaBiblica.Application.Common.Interfaces;
 using EscolaBiblica.Application.Common.Mappings;
 using EscolaBiblica.Domain.Interfaces;
-using EscolaBiblica.Infrastructure.Persistence;
 using MediatR;
 
 namespace EscolaBiblica.Application.Features.Igrejas.Queries;

@@ -1,7 +1,7 @@
 using EscolaBiblica.Application.Common.Exceptions;
+using EscolaBiblica.Application.Common.Interfaces;
 using EscolaBiblica.Domain.Entities;
 using EscolaBiblica.Domain.Interfaces;
-using EscolaBiblica.Infrastructure.Persistence;
 using MediatR;
 
 namespace EscolaBiblica.Application.Features.Igrejas.Commands;
