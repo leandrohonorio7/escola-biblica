@@ -1,0 +1,74 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components
+
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <CascadingAuthenticationState>
+            @if (IsPublicRoute(routeData))
+            {
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            }
+            else
+            {
+                <AuthorizeView>
+                    <Authorized>
+                        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+                    </Authorized>
+                    <NotAuthorized>
+                        <RedirectToLogin />
+                    </NotAuthorized>
+                </AuthorizeView>
+            }
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </CascadingAuthenticationState>
+    </Found>
+    <NotFound>
+        <PageTitle>Não encontrado</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="d-flex justify-center align-center" style="height: 100vh;">
+                <MudContainer MaxWidth="MaxWidth.Medium">
+                    <MudPaper Elevation="3" Class="pa-8 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+                        <MudText Typo="Typo.h4" Class="mb-4">Página não encontrada</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-4">
+                            A página que você está procurando não existe ou foi movida.
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" StartIcon="@Icons.Material.Filled.Home">
+                            Voltar ao Início
+                        </MudButton>
+                    </MudPaper>
+                </MudContainer>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+<PWAUpdateComponent />
+
+@code {
+    private readonly HashSet<string> _publicRoutes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "",
+        "/",
+        "/login",
+        "/forgot-password",
+        "/register"
+    };
+
+    private bool IsPublicRoute(RouteData routeData)
+    {
+        var routeTemplate = routeData.PageType.GetCustomAttributes(typeof(RouteAttribute), false)
+            .Cast<RouteAttribute>()
+            .FirstOrDefault()?.Template;
+            
+        if (string.IsNullOrEmpty(routeTemplate))
+            return false;
+            
+        // Normalizar a rota removendo parâmetros
+        var normalizedRoute = routeTemplate.Split('{')[0].TrimEnd('/');
+        if (string.IsNullOrEmpty(normalizedRoute))
+            normalizedRoute = "/";
+            
+        return _publicRoutes.Contains(normalizedRoute);
+    }
+}

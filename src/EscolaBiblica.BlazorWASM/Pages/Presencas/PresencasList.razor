@@ -1,0 +1,414 @@
+@page "/presencas"
+@page "/presencas/registrar"
+@using EscolaBiblica.BlazorWASM.Services
+@using EscolaBiblica.BlazorWASM.Models
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Presenças - Escola Bíblica</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+        Registro de Presenças
+    </MudText>
+
+    <MudCard Class="mb-4">
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker @bind-Date="dataAula"
+                                   Label="Data da Aula"
+                                   Variant="Variant.Outlined"
+                                   MaxDate="DateTime.Today" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect Value="turmaId"
+                               Label="Turma"
+                               Variant="Variant.Outlined"
+                               Clearable="true" 
+                               T="Guid?"
+                               ValueChanged="CarregarAlunosTurma">
+                        @if (turmas != null)
+                        {
+                            @foreach (var turma in turmas.Where(t => t.Ativo))
+                            {
+                                <MudSelectItem Value="@turma.Id">@turma.Nome</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudTextField @bind-Value="filtroNomeAluno"
+                                  Label="Buscar aluno"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  OnKeyUp="FiltrarAlunos" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3" Class="d-flex align-end">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="SalvarPresencas"
+                               Disabled="@(!presencas.Any() || isSaving)"
+                               FullWidth="true">
+                        @if (isSaving)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Salvando...</span>
+                        }
+                        else
+                        {
+                            <span>Salvar Presenças</span>
+                        }
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @if (isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+    }
+    else if (alunosFiltrados?.Any() == true)
+    {
+        <!-- Ações em lote -->
+        <MudCard Class="mb-4">
+            <MudCardContent>
+                <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.subtitle1">Ações em lote:</MudText>
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Outlined"
+                               Color="Color.Success"
+                               OnClick="MarcarTodosPresentes">
+                        Marcar Todos Presentes
+                    </MudButton>
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               OnClick="MarcarTodosFaltosos">
+                        Marcar Todos Ausentes
+                    </MudButton>
+                    <MudSpacer />
+                    <MudChip Color="Color.Info" T="string">
+                        @GetEstatisticasPresenca()
+                    </MudChip>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+
+        <MudCard>
+            <MudCardContent Class="pa-0">
+                <MudList Dense="true" T="string">
+                    @foreach (var aluno in alunosFiltrados)
+                    {
+                        var presenca = presencas.FirstOrDefault(p => p.AlunoId == aluno.Id);
+                        var isPresent = presenca?.Presente ?? false;
+
+                        <MudListItem Class="px-4 py-2" T="string">
+                            <div class="d-flex justify-space-between align-center w-100">
+                                <div class="d-flex align-center">
+                                    <MudAvatar Color="@(isPresent ? Color.Success : Color.Default)" 
+                                               Size="Size.Medium" 
+                                               Class="mr-3">
+                                        @if (isPresent)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Check" />
+                                        }
+                                        else
+                                        {
+                                            @aluno.Nome.FirstOrDefault()
+                                        }
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.body1">@aluno.Nome</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @aluno.NomeTurma - @(DateTime.Today.Year - aluno.DataNascimento.Year) anos
+                                        </MudText>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-center">
+                                    <MudChip Color="@(aluno.PercentualPresenca >= 80 ? Color.Success : aluno.PercentualPresenca >= 60 ? Color.Warning : Color.Error)"
+                                             Size="Size.Small" 
+                                             Class="mr-3" T="string">
+                                        @aluno.PercentualPresenca.ToString("F0")%
+                                    </MudChip>
+
+                                    <MudButtonGroup Size="Size.Small">
+                                        <MudButton Variant="@(isPresent ? Variant.Filled : Variant.Outlined)"
+                                                   Color="Color.Success"
+                                                   OnClick="@(() => MarcarPresenca(aluno, true))"
+                                                   StartIcon="@Icons.Material.Filled.Check">
+                                            Presente
+                                        </MudButton>
+                                        <MudButton Variant="@(!isPresent && presenca != null ? Variant.Filled : Variant.Outlined)"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => MarcarPresenca(aluno, false))"
+                                                   StartIcon="@Icons.Material.Filled.Close">
+                                            Ausente
+                                        </MudButton>
+                                    </MudButtonGroup>
+
+                                    @if (presenca != null)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Comment"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => AdicionarObservacao(aluno, presenca))"
+                                                       Class="ml-2" />
+                                    }
+                                </div>
+                            </div>
+
+                            @if (presenca != null && !string.IsNullOrEmpty(presenca.Observacoes))
+                            {
+                                <MudText Typo="Typo.caption" 
+                                         Color="Color.Secondary" 
+                                         Class="mt-2 ml-16">
+                                    <MudIcon Icon="@Icons.Material.Filled.Comment" Size="Size.Small" Class="mr-1" />
+                                    @presenca.Observacoes
+                                </MudText>
+                            }
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Class="my-4">
+            @if (turmaId == null)
+            {
+                <span>Selecione uma turma para registrar as presenças.</span>
+            }
+            else if (!string.IsNullOrWhiteSpace(filtroNomeAluno))
+            {
+                <span>Nenhum aluno encontrado com o nome "@filtroNomeAluno".</span>
+            }
+            else
+            {
+                <span>Esta turma não possui alunos cadastrados.</span>
+            }
+        </MudAlert>
+    }
+</MudContainer>
+
+@code {
+    private DateTime? dataAula = DateTime.Today;
+    private Guid? turmaId;
+    private string filtroNomeAluno = string.Empty;
+    
+    private List<TurmaDto>? turmas;
+    private List<AlunoDto>? alunos;
+    private List<AlunoDto>? alunosFiltrados;
+    private List<PresencaDto> presencas = new();
+    
+    private bool isLoading = false;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarTurmas();
+    }
+
+    private async Task CarregarTurmas()
+    {
+        try
+        {
+            isLoading = true;
+            turmas = await ApiService.GetAsync<List<TurmaDto>>("api/turmas");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar turmas: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CarregarAlunosTurma(Guid? newTurmaId)
+    {
+        turmaId = newTurmaId;
+        if (turmaId == null) return;
+
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            alunos = await ApiService.GetAsync<List<AlunoDto>>($"api/alunos?turmaId={turmaId}");
+            await FiltrarAlunos();
+            
+            // Carregar presenças existentes para esta data
+            await CarregarPresencasExistentes();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar alunos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CarregarPresencasExistentes()
+    {
+        if (turmaId == null || dataAula == null) return;
+
+        try
+        {
+            var presencasExistentes = await ApiService.GetAsync<List<PresencaDto>>(
+                $"api/presencas?turmaId={turmaId}&data={dataAula:yyyy-MM-dd}");
+            
+            if (presencasExistentes?.Any() == true)
+            {
+                presencas.AddRange(presencasExistentes);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar presenças existentes: {ex.Message}");
+        }
+    }
+
+    private async Task FiltrarAlunos()
+    {
+        await Task.Delay(1);
+
+        if (alunos == null)
+        {
+            alunosFiltrados = null;
+            return;
+        }
+
+        alunosFiltrados = alunos.Where(a =>
+        {
+            if (!string.IsNullOrWhiteSpace(filtroNomeAluno) &&
+                !a.Nome.Contains(filtroNomeAluno, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return a.Ativo;
+        }).OrderBy(a => a.Nome).ToList();
+
+        StateHasChanged();
+    }
+
+    private void MarcarPresenca(AlunoDto aluno, bool presente)
+    {
+        var presencaExistente = presencas.FirstOrDefault(p => p.AlunoId == aluno.Id);
+        
+        if (presencaExistente != null)
+        {
+            presencaExistente.Presente = presente;
+        }
+        else
+        {
+            presencas.Add(new PresencaDto
+            {
+                Id = Guid.NewGuid(),
+                AlunoId = aluno.Id,
+                NomeAluno = aluno.Nome,
+                DataAula = dataAula ?? DateTime.Today,
+                Presente = presente,
+                DataRegistro = DateTime.Now
+            });
+        }
+
+        StateHasChanged();
+    }
+
+    private void MarcarTodosPresentes()
+    {
+        if (alunosFiltrados == null) return;
+
+        foreach (var aluno in alunosFiltrados)
+        {
+            MarcarPresenca(aluno, true);
+        }
+    }
+
+    private void MarcarTodosFaltosos()
+    {
+        if (alunosFiltrados == null) return;
+
+        foreach (var aluno in alunosFiltrados)
+        {
+            MarcarPresenca(aluno, false);
+        }
+    }
+
+    private async Task AdicionarObservacao(AlunoDto aluno, PresencaDto presenca)
+    {
+        // Implementar dialog para adicionar observação
+        // Por ora, apenas um placeholder
+        await Task.Delay(1); // Evitar warning de método async sem await
+        Snackbar.Add("Funcionalidade de observações será implementada em breve", Severity.Info);
+    }
+
+    private string GetEstatisticasPresenca()
+    {
+        if (!presencas.Any()) return "0 registros";
+
+        var presentes = presencas.Count(p => p.Presente);
+        var total = presencas.Count;
+        var percentual = total > 0 ? (decimal)presentes / total * 100 : 0;
+
+        return $"{presentes}/{total} presentes ({percentual:F0}%)";
+    }
+
+    private async Task SalvarPresencas()
+    {
+        if (!presencas.Any() || dataAula == null)
+        {
+            Snackbar.Add("Nenhuma presença para salvar", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            StateHasChanged();
+
+            var comandos = presencas.Select(p => new RegistrarPresencaCommand
+            {
+                AlunoId = p.AlunoId,
+                DataAula = p.DataAula,
+                Presente = p.Presente,
+                Observacoes = p.Observacoes
+            }).ToList();
+
+            foreach (var comando in comandos)
+            {
+                await ApiService.PostAsync("api/presencas", comando);
+            }
+
+            Snackbar.Add($"Presenças salvas com sucesso! ({presencas.Count} registros)", Severity.Success);
+            
+            // Limpar registros após salvar
+            presencas.Clear();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar presenças: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+}

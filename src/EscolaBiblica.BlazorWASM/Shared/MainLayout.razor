@@ -1,0 +1,152 @@
+@using MudBlazor
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="DrawerToggle" />
+        <MudSpacer />
+        <MudText Typo="Typo.h6">Escola Bíblica Dominical</MudText>
+        <MudSpacer />
+        
+        <AuthorizeView>
+            <Authorized Context="authContext">
+                <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit">
+                    <MudMenuItem>
+                        <MudText>@authContext.User.Identity?.Name</MudText>
+                    </MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Icon="@Icons.Material.Filled.Person" OnClick="GoToProfile">Perfil</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Settings" OnClick="GoToSettings">Configurações</MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="Logout">Sair</MudMenuItem>
+                </MudMenu>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login" Href="/login">
+                    Entrar
+                </MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
+    </MudAppBar>
+    
+    <MudDrawer @bind-Open="drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.School" Class="mr-2" />
+                Escola Bíblica
+            </MudText>
+        </MudDrawerHeader>
+        <MudNavMenu>
+            <AuthorizeView>
+                <Authorized Context="navContext">
+                    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+                        Dashboard
+                    </MudNavLink>
+                    
+                    <MudNavGroup Icon="@Icons.Material.Filled.Group" Expanded="true">
+                        <ChildContent>
+                            <MudText Class="px-4 py-2" Typo="Typo.subtitle2">Gerenciamento</MudText>
+                        <MudNavLink Href="/alunos" Icon="@Icons.Material.Filled.Person">
+                            Alunos
+                        </MudNavLink>
+                        <MudNavLink Href="/turmas" Icon="@Icons.Material.Filled.Class">
+                            Turmas
+                        </MudNavLink>
+                        <MudNavLink Href="/presencas" Icon="@Icons.Material.Filled.CheckCircle">
+                            Presenças
+                        </MudNavLink>
+                        </ChildContent>
+                    </MudNavGroup>
+                    
+                    <MudNavGroup Icon="@Icons.Material.Filled.EmojiEvents" Expanded="false">
+                        <ChildContent>
+                            <MudText Class="px-4 py-2" Typo="Typo.subtitle2">Competições</MudText>
+                        <MudNavLink Href="/competicoes" Icon="@Icons.Material.Filled.EmojiEvents">
+                            Competições
+                        </MudNavLink>
+                        <MudNavLink Href="/ranking" Icon="@Icons.Material.Filled.Leaderboard">
+                            Ranking
+                        </MudNavLink>
+                        </ChildContent>
+                    </MudNavGroup>
+                    
+                    <AuthorizeView Roles="AdministradorGeral,AdministradorIgreja" Context="adminContext">
+                        <Authorized>
+                            <MudNavGroup Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false">
+                                <ChildContent>
+                                    <MudText Class="px-4 py-2" Typo="Typo.subtitle2">Administração</MudText>
+                                <AuthorizeView Roles="AdministradorGeral" Context="superAdminContext">
+                                    <Authorized>
+                                        <MudNavLink Href="/igrejas" Icon="@Icons.Material.Filled.Church">
+                                            Igrejas
+                                        </MudNavLink>
+                                    </Authorized>
+                                </AuthorizeView>
+                                <MudNavLink Href="/usuarios" Icon="@Icons.Material.Filled.SupervisorAccount">
+                                    Usuários
+                                </MudNavLink>
+                                <MudNavLink Href="/relatorios" Icon="@Icons.Material.Filled.Assessment">
+                                    Relatórios
+                                </MudNavLink>
+                                </ChildContent>
+                            </MudNavGroup>
+                        </Authorized>
+                    </AuthorizeView>
+                </Authorized>
+            </AuthorizeView>
+        </MudNavMenu>
+    </MudDrawer>
+    
+    <MudMainContent Class="mt-16 pa-4">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool drawerOpen = true;
+    private MudTheme theme = new();
+    
+    [Inject] private IAuthService AuthService { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        theme = new MudTheme();
+    }
+
+    private void DrawerToggle()
+    {
+        drawerOpen = !drawerOpen;
+    }
+
+    private void GoToProfile()
+    {
+        Navigation.NavigateTo("/profile");
+    }
+
+    private void GoToSettings()
+    {
+        Navigation.NavigateTo("/settings");
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            await AuthService.LogoutAsync();
+            Snackbar.Add("Logout realizado com sucesso!", Severity.Success);
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao fazer logout: {ex.Message}", Severity.Error);
+        }
+    }
+}

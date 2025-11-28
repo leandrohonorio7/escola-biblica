@@ -1,0 +1,149 @@
+@page "/login"
+@using EscolaBiblica.BlazorWASM.Services
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-8" Elevation="4">
+        <MudText Typo="Typo.h4" Align="Align.Center" GutterBottom="true" Class="mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.School" Class="mr-2" />
+            Escola Bíblica
+        </MudText>
+
+        <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+            
+            <MudStack Spacing="4">
+                <MudTextField @bind-Value="loginModel.EmailOrUsername"
+                              Label="E-mail ou Usuário"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Text"
+                              Required="true"
+                              RequiredError="E-mail ou usuário é obrigatório"
+                              For="@(() => loginModel.EmailOrUsername)"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Person" />
+
+                <MudTextField @bind-Value="loginModel.Password"
+                              Label="Senha"
+                              Variant="Variant.Outlined"
+                              InputType="@passwordInput"
+                              Required="true"
+                              RequiredError="Senha é obrigatória"
+                              For="@(() => loginModel.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@passwordIcon"
+                              OnAdornmentClick="TogglePasswordVisibility" />
+
+                <MudCheckBox @bind-Value="loginModel.RememberMe"
+                             Label="Lembrar-me"
+                             Color="Color.Primary"
+                             T="bool" />
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Login"
+                           Class="mt-4"
+                           Disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                        <span>Entrando...</span>
+                    }
+                    else
+                    {
+                        <span>Entrar</span>
+                    }
+                </MudButton>
+
+                <ValidationSummary />
+            </MudStack>
+        </EditForm>
+
+        <MudDivider Class="my-6" />
+
+        <MudStack Row Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Esqueceu sua senha?
+            </MudText>
+            <MudLink Href="/forgot-password" Color="Color.Primary">
+                Clique aqui
+            </MudLink>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private LoginModel loginModel = new();
+    private bool isLoading = false;
+    private bool showPassword = false;
+    private InputType passwordInput = InputType.Password;
+    private string passwordIcon = Icons.Material.Filled.VisibilityOff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Verificar se o usuário já está autenticado
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            var success = await AuthService.LoginAsync(loginModel.EmailOrUsername, loginModel.Password);
+
+            if (success)
+            {
+                Snackbar.Add("Login realizado com sucesso!", Severity.Success);
+                
+                // Aguardar um momento para mostrar a mensagem
+                await Task.Delay(500);
+                
+                Navigation.NavigateTo("/", true);
+            }
+            else
+            {
+                Snackbar.Add("E-mail ou senha inválidos. Tente novamente.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao fazer login: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+        passwordInput = showPassword ? InputType.Text : InputType.Password;
+        passwordIcon = showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "E-mail ou usuário é obrigatório")]
+        public string EmailOrUsername { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Senha é obrigatória")]
+        [MinLength(3, ErrorMessage = "A senha deve ter pelo menos 3 caracteres")]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+}

@@ -1,0 +1,55 @@
+## Build
+bin/
+obj/
+out/
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## IDE
+.vs/
+.vscode/
+*.swp
+*.swo
+
+## Logs
+logs/
+*.log
+*.log.*
+
+## Runtime
+*.pid
+*.seed
+*.pid.lock
+
+## Coverage
+coverage/
+*.cover
+*.py,cover
+*,cover
+
+## Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+## Azure
+.azure/
+
+## Database
+*.db
+*.db-shm
+*.db-wal
+
+## Node modules (se usar ferramentas Node)
+node_modules/
+
+## Temporary files
+*.tmp
+*.temp

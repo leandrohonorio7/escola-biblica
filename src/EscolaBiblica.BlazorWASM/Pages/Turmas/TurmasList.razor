@@ -1,0 +1,298 @@
+@page "/turmas"
+@using EscolaBiblica.BlazorWASM.Services
+@using EscolaBiblica.BlazorWASM.Models
+@inject IApiService ApiService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Turmas - Escola Bíblica</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Class" Class="mr-2" />
+            Turmas
+        </MudText>
+        
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => Navigation.NavigateTo("/turmas/nova"))">
+            Nova Turma
+        </MudButton>
+    </div>
+
+    <!-- Filtros -->
+    <MudCard Class="mb-4">
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudTextField @bind-Value="filtroNome"
+                                  Label="Buscar por nome"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  OnKeyUp="@(async () => await FiltrarTurmas())" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudSelect @bind-Value="filtroStatus"
+                               Label="Status"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("todos")">Todas</MudSelectItem>
+                        <MudSelectItem Value="@("ativo")">Ativas</MudSelectItem>
+                        <MudSelectItem Value="@("inativo")">Inativas</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.Clear"
+                               OnClick="LimparFiltros">
+                        Limpar
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @if (isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+    }
+    else if (turmasFiltradas?.Any() == true)
+    {
+        <MudGrid>
+            @foreach (var turma in turmasFiltradas)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Class="mud-height-full">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <div class="d-flex align-center">
+                                    <MudAvatar Color="Color.Secondary" Class="mr-3">
+                                        <MudIcon Icon="@Icons.Material.Filled.Class" />
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.h6">@turma.Nome</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @turma.IdadeMinima - @turma.IdadeMaxima anos
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudChip Color="@(turma.Ativo ? Color.Success : Color.Default)" 
+                                         Size="Size.Small" T="string">
+                                    @(turma.Ativo ? "Ativa" : "Inativa")
+                                </MudChip>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        
+                        <MudCardContent>
+                            @if (!string.IsNullOrEmpty(turma.Descricao))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-3">@turma.Descricao</MudText>
+                            }
+                            
+                            <MudStack Row Spacing="2" Class="mb-3">
+                                <MudChip Color="Color.Info" Size="Size.Small" T="string">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Style="margin-right: 8px;" />
+                                    @turma.TotalAlunos alunos
+                                </MudChip>
+                                
+                                @if (!string.IsNullOrEmpty(turma.NomeProfessor))
+                                {
+                                    <MudChip Color="Color.Primary" Size="Size.Small" T="string">
+                                        <MudIcon Icon="@Icons.Material.Filled.School" Style="margin-right: 8px;" />
+                                        @turma.NomeProfessor
+                                    </MudChip>
+                                }
+                            </MudStack>
+                        </MudCardContent>
+                        
+                        <MudCardActions Class="justify-space-between">
+                            <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(() => VisualizarTurma(turma))">
+                                Ver
+                            </MudButton>
+                            
+                            <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Color="Color.Secondary"
+                                               OnClick="@(() => EditarTurma(turma))"
+                                               Size="Size.Small" />
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonAdd"
+                                               Color="Color.Success"
+                                               OnClick="@(() => AdicionarAluno(turma))"
+                                               Size="Size.Small" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error"
+                                               OnClick="@(() => ExcluirTurma(turma))"
+                                               Size="Size.Small" />
+                            </MudButtonGroup>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudCard>
+            <MudCardContent>
+                <div class="d-flex flex-column align-center justify-center pa-8">
+                    <MudIcon Icon="@Icons.Material.Filled.Class" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-2">
+                        Nenhuma turma encontrada
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                        @if (HasFiltrosAtivos())
+                        {
+                            <span>Tente alterar os filtros ou adicionar uma nova turma.</span>
+                        }
+                        else
+                        {
+                            <span>Comece criando a primeira turma da escola bíblica.</span>
+                        }
+                    </MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="@(() => Navigation.NavigateTo("/turmas/nova"))"
+                               Class="mt-4">
+                        Criar Primeira Turma
+                    </MudButton>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    }
+</MudContainer>
+
+@code {
+    private List<TurmaDto>? turmas;
+    private List<TurmaDto>? turmasFiltradas;
+    private bool isLoading = true;
+
+    // Filtros
+    private string filtroNome = string.Empty;
+    private string filtroStatus = "todos";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            turmas = await ApiService.GetAsync<List<TurmaDto>>("api/turmas");
+            await FiltrarTurmas();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar turmas: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task FiltrarTurmas()
+    {
+        await Task.Delay(1); // Para evitar problemas de sincronização
+
+        if (turmas == null)
+        {
+            turmasFiltradas = null;
+            return;
+        }
+
+        turmasFiltradas = turmas.Where(t =>
+        {
+            // Filtro por nome
+            if (!string.IsNullOrWhiteSpace(filtroNome) &&
+                !t.Nome.Contains(filtroNome, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            // Filtro por status
+            if (filtroStatus == "ativo" && !t.Ativo)
+                return false;
+            if (filtroStatus == "inativo" && t.Ativo)
+                return false;
+
+            return true;
+        }).ToList();
+
+        StateHasChanged();
+    }
+
+    private void LimparFiltros()
+    {
+        filtroNome = string.Empty;
+        filtroStatus = "todos";
+        _ = FiltrarTurmas();
+    }
+
+    private async Task OnStatusChanged()
+    {
+        await FiltrarTurmas();
+    }
+
+    private bool HasFiltrosAtivos()
+    {
+        return !string.IsNullOrWhiteSpace(filtroNome) || filtroStatus != "todos";
+    }
+
+    private void VisualizarTurma(TurmaDto turma)
+    {
+        Navigation.NavigateTo($"/turmas/{turma.Id}");
+    }
+
+    private void EditarTurma(TurmaDto turma)
+    {
+        Navigation.NavigateTo($"/turmas/{turma.Id}/editar");
+    }
+
+    private void AdicionarAluno(TurmaDto turma)
+    {
+        Navigation.NavigateTo($"/alunos/novo?turma={turma.Id}");
+    }
+
+    private async Task ExcluirTurma(TurmaDto turma)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Tem certeza que deseja excluir a turma '{turma.Nome}'? Esta ação não pode ser desfeita.",
+            ["ButtonText"] = "Excluir",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar Exclusão", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/turmas/{turma.Id}");
+                Snackbar.Add($"Turma '{turma.Nome}' excluída com sucesso!", Severity.Success);
+                await CarregarDados();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir turma: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

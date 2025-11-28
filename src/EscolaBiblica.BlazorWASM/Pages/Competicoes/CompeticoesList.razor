@@ -1,0 +1,443 @@
+@page "/competicoes"
+@using EscolaBiblica.BlazorWASM.Models
+@using EscolaBiblica.BlazorWASM.Services
+@inject ICompeticaoService CompeticaoService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Competições - Escola Bíblica</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudStack Spacing="4">
+        <!-- Cabeçalho -->
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Large" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.h4">Competições</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Gerencie competições e rankings da escola bíblica
+                        </MudText>
+                    </div>
+                </MudStack>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="NovaCompeticao">
+                    Nova Competição
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        <!-- Estatísticas Rápidas -->
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.h5">@competicoes.Count(c => c.Status == StatusCompeticao.EmAndamento)</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Em Andamento</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Size="Size.Large" />
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.h5">@competicoes.Count(c => c.Status == StatusCompeticao.Inscricoes)</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Abertas p/ Inscrição</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.HowToReg" Color="Color.Info" Size="Size.Large" />
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.h5">@competicoes.Count(c => c.Status == StatusCompeticao.Finalizada)</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Finalizadas</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Color="Color.Warning" Size="Size.Large" />
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.h5">@competicoes.Count</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Total</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.Assessment" Color="Color.Primary" Size="Size.Large" />
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Filtros -->
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudGrid AlignItems="AlignItems.End">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect @bind-Value="filtroStatus" 
+                               Label="Status" 
+                               Variant="Variant.Outlined"
+                               Clearable="true"
+                               SelectedValueChanged="@(async (StatusCompeticao? value) => { filtroStatus = value; await FiltrarCompeticoes(); })">
+                        <MudSelectItem Value="@((StatusCompeticao?)StatusCompeticao.Planejada)">Planejada</MudSelectItem>
+                        <MudSelectItem Value="@((StatusCompeticao?)StatusCompeticao.Inscricoes)">Inscrições Abertas</MudSelectItem>
+                        <MudSelectItem Value="@((StatusCompeticao?)StatusCompeticao.EmAndamento)">Em Andamento</MudSelectItem>
+                        <MudSelectItem Value="@((StatusCompeticao?)StatusCompeticao.Avaliacao)">Avaliação</MudSelectItem>
+                        <MudSelectItem Value="@((StatusCompeticao?)StatusCompeticao.Finalizada)">Finalizada</MudSelectItem>
+                        <MudSelectItem Value="@((StatusCompeticao?)StatusCompeticao.Cancelada)">Cancelada</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect @bind-Value="filtroTipo" 
+                               Label="Tipo" 
+                               Variant="Variant.Outlined"
+                               Clearable="true"
+                               SelectedValueChanged="@(async (TipoCompeticao? value) => { filtroTipo = value; await FiltrarCompeticoes(); })">
+                        <MudSelectItem Value="@((TipoCompeticao?)TipoCompeticao.Individual)">Individual</MudSelectItem>
+                        <MudSelectItem Value="@((TipoCompeticao?)TipoCompeticao.Equipe)">Equipe</MudSelectItem>
+                        <MudSelectItem Value="@((TipoCompeticao?)TipoCompeticao.PorTurma)">Por Turma</MudSelectItem>
+                        <MudSelectItem Value="@((TipoCompeticao?)TipoCompeticao.Geral)">Geral</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudTextField @bind-Value="filtroNome"
+                                  Label="Buscar por nome"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  OnAdornmentClick="@(async () => await FiltrarCompeticoes())"
+                                  OnKeyPress="@(async (KeyboardEventArgs e) => { if (e.Key == "Enter") await FiltrarCompeticoes(); })" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudButton Variant="Variant.Outlined" 
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="CarregarCompeticoes">
+                        Atualizar
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Lista de Competições -->
+        @if (isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+            <MudText Align="Align.Center" Class="my-4">Carregando competições...</MudText>
+        }
+        else if (!competicoesFiltradas.Any())
+        {
+            <MudPaper Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Class="mt-4">Nenhuma competição encontrada</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    @(string.IsNullOrEmpty(filtroNome) || !filtroStatus.HasValue || !filtroTipo.HasValue 
+                      ? "Comece criando sua primeira competição" 
+                      : "Tente ajustar os filtros ou criar uma nova competição")
+                </MudText>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="NovaCompeticao">
+                    Criar Primeira Competição
+                </MudButton>
+            </MudPaper>
+        }
+        else
+        {
+            <MudGrid>
+                @foreach (var competicao in competicoesFiltradas)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudStack Spacing="3">
+                                    <!-- Cabeçalho do Card -->
+                                    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+                                        <MudText Typo="Typo.h6" Class="text-truncate">@competicao.Nome</MudText>
+                                        <MudChip T="string" Size="Size.Small" 
+                                                 Color="@GetStatusColor(competicao.Status)"
+                                                 Text="@GetStatusText(competicao.Status)" />
+                                    </MudStack>
+
+                                    <!-- Descrição -->
+                                    <MudText Typo="Typo.body2" 
+                                             Color="Color.Secondary" 
+                                             Class="description-text">
+                                        @competicao.Descricao
+                                    </MudText>
+
+                                    <!-- Informações -->
+                                    <MudStack Spacing="2">
+                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" />
+                                            <MudText Typo="Typo.body2">@GetTipoText(competicao.Tipo)</MudText>
+                                        </MudStack>
+                                        
+                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudIcon Icon="@Icons.Material.Filled.DateRange" Size="Size.Small" />
+                                            <MudText Typo="Typo.body2">
+                                                @competicao.DataInicio.ToString("dd/MM/yyyy") - @competicao.DataFim.ToString("dd/MM/yyyy")
+                                            </MudText>
+                                        </MudStack>
+
+                                        <!-- Pesos da Avaliação -->
+                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudIcon Icon="@Icons.Material.Filled.Balance" Size="Size.Small" />
+                                            <MudText Typo="Typo.caption">
+                                                P: @(competicao.PesoProva)% | Pr: @(competicao.PesoPresenca)% | C: @(competicao.PesoComportamento)%
+                                            </MudText>
+                                        </MudStack>
+                                    </MudStack>
+                                </MudStack>
+                            </MudCardContent>
+                            
+                            <MudCardActions>
+                                <MudButtonGroup OverrideStyles="false">
+                                    <MudTooltip Text="Ver Detalhes">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => VerDetalhes(competicao.Id))" />
+                                    </MudTooltip>
+                                    
+                                    <MudTooltip Text="Ver Ranking">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Leaderboard"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => VerRanking(competicao.Id))" />
+                                    </MudTooltip>
+                                    
+                                    @if (competicao.Status != StatusCompeticao.Finalizada)
+                                    {
+                                        <MudTooltip Text="Editar">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                           Color="Color.Secondary"
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => EditarCompeticao(competicao.Id))" />
+                                        </MudTooltip>
+                                    }
+                                    
+                                    @if (competicao.Status == StatusCompeticao.EmAndamento)
+                                    {
+                                        <MudTooltip Text="Finalizar">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Flag"
+                                                           Color="Color.Success"
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => FinalizarCompeticao(competicao.Id))" />
+                                        </MudTooltip>
+                                    }
+                                    
+                                    <MudTooltip Text="Excluir">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => ExcluirCompeticao(competicao.Id))" />
+                                    </MudTooltip>
+                                </MudButtonGroup>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </MudStack>
+</MudContainer>
+
+@code {
+    private List<CompeticaoDto> competicoes = new();
+    private List<CompeticaoDto> competicoesFiltradas = new();
+    private bool isLoading = true;
+
+    // Filtros
+    private StatusCompeticao? filtroStatus;
+    private TipoCompeticao? filtroTipo;
+    private string filtroNome = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarCompeticoes();
+    }
+
+    private async Task CarregarCompeticoes()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            competicoes = await CompeticaoService.GetCompeticoesAsync();
+            await FiltrarCompeticoes();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar competições: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task FiltrarCompeticoes()
+    {
+        await Task.Delay(100); // Simular processamento
+
+        competicoesFiltradas = competicoes
+            .Where(c => !filtroStatus.HasValue || c.Status == filtroStatus.Value)
+            .Where(c => !filtroTipo.HasValue || c.Tipo == filtroTipo.Value)
+            .Where(c => string.IsNullOrEmpty(filtroNome) || 
+                       c.Nome.Contains(filtroNome, StringComparison.OrdinalIgnoreCase) ||
+                       c.Descricao.Contains(filtroNome, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(c => c.DataCriacao)
+            .ToList();
+
+        StateHasChanged();
+    }
+
+    private void NovaCompeticao()
+    {
+        Navigation.NavigateTo("/competicoes/nova");
+    }
+
+    private void VerDetalhes(Guid id)
+    {
+        Navigation.NavigateTo($"/competicoes/{id}");
+    }
+
+    private void VerRanking(Guid id)
+    {
+        Navigation.NavigateTo($"/competicoes/{id}/ranking");
+    }
+
+    private void EditarCompeticao(Guid id)
+    {
+        Navigation.NavigateTo($"/competicoes/{id}/editar");
+    }
+
+    private async Task FinalizarCompeticao(Guid id)
+    {
+        var competicao = competicoes.FirstOrDefault(c => c.Id == id);
+        if (competicao == null) return;
+
+        var confirmacao = await DialogService.ShowMessageBox(
+            "Confirmar Finalização",
+            $"Tem certeza que deseja finalizar a competição '{competicao.Nome}'? Esta ação não pode ser desfeita.",
+            yesText: "Finalizar",
+            cancelText: "Cancelar");
+
+        if (confirmacao == true)
+        {
+            try
+            {
+                var sucesso = await CompeticaoService.FinalizarCompeticaoAsync(id);
+                if (sucesso)
+                {
+                    Snackbar.Add("Competição finalizada com sucesso!", Severity.Success);
+                    await CarregarCompeticoes();
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao finalizar competição", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao finalizar competição: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ExcluirCompeticao(Guid id)
+    {
+        var competicao = competicoes.FirstOrDefault(c => c.Id == id);
+        if (competicao == null) return;
+
+        var confirmacao = await DialogService.ShowMessageBox(
+            "Confirmar Exclusão",
+            $"Tem certeza que deseja excluir a competição '{competicao.Nome}'? Esta ação não pode ser desfeita.",
+            yesText: "Excluir",
+            cancelText: "Cancelar");
+
+        if (confirmacao == true)
+        {
+            try
+            {
+                var sucesso = await CompeticaoService.DeleteCompeticaoAsync(id);
+                if (sucesso)
+                {
+                    Snackbar.Add("Competição excluída com sucesso!", Severity.Success);
+                    await CarregarCompeticoes();
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao excluir competição", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir competição: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetStatusColor(StatusCompeticao status) => status switch
+    {
+        StatusCompeticao.Planejada => Color.Default,
+        StatusCompeticao.Inscricoes => Color.Info,
+        StatusCompeticao.EmAndamento => Color.Success,
+        StatusCompeticao.Avaliacao => Color.Warning,
+        StatusCompeticao.Finalizada => Color.Primary,
+        StatusCompeticao.Cancelada => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(StatusCompeticao status) => status switch
+    {
+        StatusCompeticao.Planejada => "Planejada",
+        StatusCompeticao.Inscricoes => "Inscrições",
+        StatusCompeticao.EmAndamento => "Em Andamento",
+        StatusCompeticao.Avaliacao => "Avaliação",
+        StatusCompeticao.Finalizada => "Finalizada",
+        StatusCompeticao.Cancelada => "Cancelada",
+        _ => status.ToString()
+    };
+
+    private string GetTipoText(TipoCompeticao tipo) => tipo switch
+    {
+        TipoCompeticao.Individual => "Individual",
+        TipoCompeticao.Equipe => "Por Equipe",
+        TipoCompeticao.PorTurma => "Por Turma",
+        TipoCompeticao.Geral => "Geral",
+        _ => tipo.ToString()
+    };
+}
+
+<style>
+    .description-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: 2.4em;
+    }
+</style>

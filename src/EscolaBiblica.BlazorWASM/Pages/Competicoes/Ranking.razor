@@ -1,0 +1,344 @@
+@page "/ranking"
+@using EscolaBiblica.BlazorWASM.Models
+@using EscolaBiblica.BlazorWASM.Services
+@inject ICompeticaoService CompeticaoService
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>Ranking - Escola Bíblica</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudStack Spacing="4">
+        <!-- Cabeçalho -->
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Leaderboard" Size="Size.Large" Color="Color.Primary" />
+                <div>
+                    <MudText Typo="Typo.h4">Ranking Geral</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Rankings das competições ativas e finalizadas
+                    </MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+
+        <!-- Seletor de Competição -->
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudGrid AlignItems="AlignItems.End">
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="competicaoSelecionada"
+                               Label="Selecionar Competição"
+                               Variant="Variant.Outlined"
+                               SelectedValueChanged="@(async (CompeticaoDto value) => { competicaoSelecionada = value; await CarregarRanking(); })">
+                        @foreach (var competicao in competicoes)
+                        {
+                            <MudSelectItem Value="competicao">
+                                @competicao.Nome (@GetStatusText(competicao.Status))
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudButton Variant="Variant.Outlined"
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="CarregarDados">
+                        Atualizar
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Ranking -->
+        @if (isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+            <MudText Align="Align.Center" Class="my-4">Carregando ranking...</MudText>
+        }
+        else if (competicaoSelecionada == null)
+        {
+            <MudPaper Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Class="mt-4">Selecione uma Competição</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Escolha uma competição para visualizar o ranking
+                </MudText>
+            </MudPaper>
+        }
+        else if (!participantes.Any())
+        {
+            <MudPaper Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Class="mt-4">Nenhum Participante</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Esta competição ainda não possui participantes inscritos
+                </MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <!-- Pódio (Top 3) -->
+            @if (participantes.Count >= 3)
+            {
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h5" Class="mb-4 text-center">🏆 Pódio</MudText>
+                    <MudGrid Justify="Justify.Center">
+                        <!-- 2º Lugar -->
+                        <MudItem xs="4">
+                            <MudCard Class="podium-card segunda-posicao">
+                                <MudCardContent Class="text-center">
+                                    <MudText Typo="Typo.h4" Color="Color.Secondary">2º</MudText>
+                                    <MudAvatar Size="Size.Large" Class="my-2" Color="Color.Secondary">
+                                        @participantes[1].NomeAluno[0]
+                                    </MudAvatar>
+                                    <MudText Typo="Typo.h6">@participantes[1].NomeAluno</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@participantes[1].NomeTurma</MudText>
+                                    <MudText Typo="Typo.h5" Color="Color.Secondary">@participantes[1].NotaFinal.ToString("F1")</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        
+                        <!-- 1º Lugar -->
+                        <MudItem xs="4">
+                            <MudCard Class="podium-card primeira-posicao">
+                                <MudCardContent Class="text-center">
+                                    <MudText Typo="Typo.h4" Color="Color.Warning">1º</MudText>
+                                    <MudAvatar Size="Size.Large" Class="my-2" Color="Color.Warning">
+                                        @participantes[0].NomeAluno[0]
+                                    </MudAvatar>
+                                    <MudText Typo="Typo.h6">@participantes[0].NomeAluno</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@participantes[0].NomeTurma</MudText>
+                                    <MudText Typo="Typo.h5" Color="Color.Warning">@participantes[0].NotaFinal.ToString("F1")</MudText>
+                                    <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Color="Color.Warning" />
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        
+                        <!-- 3º Lugar -->
+                        <MudItem xs="4">
+                            <MudCard Class="podium-card terceira-posicao">
+                                <MudCardContent Class="text-center">
+                                    <MudText Typo="Typo.h4" Color="Color.Info">3º</MudText>
+                                    <MudAvatar Size="Size.Large" Class="my-2" Color="Color.Info">
+                                        @participantes[2].NomeAluno[0]
+                                    </MudAvatar>
+                                    <MudText Typo="Typo.h6">@participantes[2].NomeAluno</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@participantes[2].NomeTurma</MudText>
+                                    <MudText Typo="Typo.h5" Color="Color.Info">@participantes[2].NotaFinal.ToString("F1")</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+
+            <!-- Tabela Completa -->
+            <MudPaper Class="pa-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-3">Classificação Geral</MudText>
+                <MudDataGrid Items="@participantes" 
+                             Dense="true"
+                             Hover="true"
+                             ReadOnly="true"
+                             FixedHeader="true">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Posicao" Title="Pos." Sortable="false">
+                            <CellTemplate>
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                    @if (context.Item.Posicao <= 3)
+                                    {
+                                        <MudIcon Icon="@GetPosicaoIcon(context.Item.Posicao)" 
+                                                 Color="@GetPosicaoColor(context.Item.Posicao)" />
+                                    }
+                                    <MudText Typo="Typo.body2">@context.Item.Posicao</MudText>
+                                </MudStack>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="x => x.NomeAluno" Title="Participante">
+                            <CellTemplate>
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="3">
+                                    <MudAvatar Size="Size.Small" Color="@GetPosicaoColor(context.Item.Posicao)">
+                                        @context.Item.NomeAluno[0]
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.body2">@context.Item.NomeAluno</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.NomeTurma</MudText>
+                                    </div>
+                                </MudStack>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="x => x.NotaProva" Title="Prova" Format="F1" Sortable="true">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2">@context.Item.NotaProva.ToString("F1")</MudText>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="x => x.NotaPresenca" Title="Presença" Format="F1" Sortable="true">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2">@context.Item.NotaPresenca.ToString("F1")</MudText>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="x => x.NotaComportamento" Title="Comportamento" Format="F1" Sortable="true">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2">@context.Item.NotaComportamento.ToString("F1")</MudText>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="x => x.NotaFinal" Title="Nota Final" Sortable="false">
+                            <CellTemplate>
+                                <MudChip Color="@GetNotaColor(context.Item.NotaFinal)" Size="Size.Small">
+                                    @context.Item.NotaFinal.ToString("F1")
+                                </MudChip>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="x => x.Status" Title="Status">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" 
+                                         Color="@GetStatusParticipacaoColor(context.Item.Status)"
+                                         Text="@GetStatusParticipacaoText(context.Item.Status)" />
+                            </CellTemplate>
+                        </PropertyColumn>
+                    </Columns>
+                </MudDataGrid>
+            </MudPaper>
+        }
+    </MudStack>
+</MudContainer>
+
+@code {
+    private List<CompeticaoDto> competicoes = new();
+    private List<ParticipanteCompeticaoDto> participantes = new();
+    private CompeticaoDto? competicaoSelecionada;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            competicoes = await CompeticaoService.GetCompeticoesAsync();
+            
+            // Selecionar a primeira competição em andamento ou finalizada
+            competicaoSelecionada = competicoes
+                .Where(c => c.Status == StatusCompeticao.EmAndamento || c.Status == StatusCompeticao.Finalizada)
+                .OrderByDescending(c => c.DataCriacao)
+                .FirstOrDefault();
+
+            if (competicaoSelecionada != null)
+            {
+                await CarregarRanking();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CarregarRanking()
+    {
+        if (competicaoSelecionada == null) return;
+
+        try
+        {
+            participantes = await CompeticaoService.GetRankingAsync(competicaoSelecionada.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar ranking: {ex.Message}", Severity.Error);
+            participantes = new();
+        }
+    }
+
+    private string GetPosicaoIcon(int posicao) => posicao switch
+    {
+        1 => Icons.Material.Filled.EmojiEvents,
+        2 => Icons.Material.Filled.WorkspacePremium,
+        3 => Icons.Material.Filled.Stars,
+        _ => Icons.Material.Filled.Person
+    };
+
+    private Color GetPosicaoColor(int posicao) => posicao switch
+    {
+        1 => Color.Warning,
+        2 => Color.Secondary,
+        3 => Color.Info,
+        _ => Color.Default
+    };
+
+    private Color GetNotaColor(decimal nota) => nota switch
+    {
+        >= 9 => Color.Success,
+        >= 7 => Color.Warning,
+        >= 5 => Color.Info,
+        _ => Color.Error
+    };
+
+    private Color GetStatusParticipacaoColor(StatusParticipacao status) => status switch
+    {
+        StatusParticipacao.Finalizado => Color.Success,
+        StatusParticipacao.Participando => Color.Primary,
+        StatusParticipacao.Confirmado => Color.Info,
+        StatusParticipacao.Inscrito => Color.Default,
+        StatusParticipacao.Desclassificado => Color.Error,
+        StatusParticipacao.Desistente => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string GetStatusParticipacaoText(StatusParticipacao status) => status switch
+    {
+        StatusParticipacao.Inscrito => "Inscrito",
+        StatusParticipacao.Confirmado => "Confirmado",
+        StatusParticipacao.Participando => "Participando",
+        StatusParticipacao.Finalizado => "Finalizado",
+        StatusParticipacao.Desclassificado => "Desclassificado",
+        StatusParticipacao.Desistente => "Desistente",
+        _ => status.ToString()
+    };
+
+    private string GetStatusText(StatusCompeticao status) => status switch
+    {
+        StatusCompeticao.Planejada => "Planejada",
+        StatusCompeticao.Inscricoes => "Inscrições",
+        StatusCompeticao.EmAndamento => "Em Andamento",
+        StatusCompeticao.Avaliacao => "Avaliação",
+        StatusCompeticao.Finalizada => "Finalizada",
+        StatusCompeticao.Cancelada => "Cancelada",
+        _ => status.ToString()
+    };
+}
+
+<style>
+    .podium-card {
+        transition: all 0.3s ease;
+    }
+
+    .podium-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .primeira-posicao {
+        margin-top: -10px;
+    }
+
+    .segunda-posicao,
+    .terceira-posicao {
+        margin-top: 10px;
+    }
+</style>

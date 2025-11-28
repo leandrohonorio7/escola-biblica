@@ -1,0 +1,35 @@
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="d-flex justify-center align-center auth-loading">
+    <MudContainer MaxWidth="MaxWidth.Medium">
+        <MudPaper Elevation="3" Class="pa-8 text-center">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Class="mb-4" />
+            <MudText Typo="Typo.h5" Class="mb-4">Redirecionando para o login...</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                Você precisa estar logado para acessar esta página.
+            </MudText>
+        </MudPaper>
+    </MudContainer>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Aguardar um momento para mostrar a mensagem
+            await Task.Delay(1000);
+            
+            // Redirecionar para login
+            Navigation.NavigateTo("/login", true);
+        }
+    }
+}
+
+<style>
+    .auth-loading {
+        height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+</style>

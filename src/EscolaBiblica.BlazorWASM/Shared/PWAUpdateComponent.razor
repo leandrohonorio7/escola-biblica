@@ -1,0 +1,187 @@
+@using Microsoft.JSInterop
+@using EscolaBiblica.BlazorWASM.Services
+@inject IPWAService PWAService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@implements IDisposable
+
+<MudSnackbarProvider />
+
+@if (showUpdatePrompt)
+{
+    <MudOverlay Visible="true" DarkBackground="true">
+        <MudPaper Class="pa-6 ma-4" MaxWidth="400px">
+            <div class="d-flex flex-column align-center">
+                <MudIcon Icon="@Icons.Material.Filled.SystemUpdate" 
+                         Color="Color.Primary" 
+                         Size="Size.Large" 
+                         Class="mb-4" />
+                
+                <MudText Typo="Typo.h6" Class="mb-2" Align="Align.Center">
+                    Nova versão disponível!
+                </MudText>
+                
+                <MudText Typo="Typo.body2" Class="mb-4" Align="Align.Center">
+                    Uma nova versão da Escola Bíblica está disponível. 
+                    Deseja atualizar agora?
+                </MudText>
+                
+                <MudStack Row Spacing="2" Justify="Justify.Center">
+                    <MudButton Color="Color.Primary" 
+                               Variant="Variant.Filled"
+                               OnClick="AcceptUpdate">
+                        Atualizar
+                    </MudButton>
+                    <MudButton Color="Color.Secondary" 
+                               Variant="Variant.Outlined"
+                               OnClick="DismissUpdate">
+                        Depois
+                    </MudButton>
+                </MudStack>
+            </div>
+        </MudPaper>
+    </MudOverlay>
+}
+
+@if (showInstallPrompt)
+{
+    <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
+        <MudPaper Class="pa-4" MaxWidth="300px">
+            <div class="d-flex align-center justify-space-between">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.GetApp" Class="mr-2" />
+                    <span>Instale a Escola Bíblica como app</span>
+                </div>
+                <MudButton Color="Color.Inherit" 
+                           Size="Size.Small"
+                           OnClick="InstallPWA">
+                    Instalar
+                </MudButton>
+            </div>
+        </MudPaper>
+    </div>
+}
+
+@code {
+    private bool showUpdatePrompt = false;
+    private bool showInstallPrompt = false;
+    private bool isOnline = true;
+    private DotNetObjectReference<PWAUpdateComponent>? objRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        
+        // Configurar callbacks JavaScript
+        await JS.InvokeVoidAsync("window.blazorPWAComponent", objRef);
+        
+        // Verificar se pode ser instalado
+        if (await PWAService.IsInstallableAsync())
+        {
+            // Mostrar prompt de instalação após um delay
+            _ = Task.Delay(TimeSpan.FromSeconds(10)).ContinueWith(async _ =>
+            {
+                await InvokeAsync(() =>
+                {
+                    showInstallPrompt = true;
+                    StateHasChanged();
+                });
+            });
+        }
+
+        // Verificar status de conectividade
+        isOnline = await PWAService.IsOnlineAsync();
+        
+        if (!isOnline)
+        {
+            Snackbar.Add("Você está offline. Algumas funcionalidades podem estar limitadas.", 
+                        Severity.Warning, config =>
+                        {
+                            config.RequireInteraction = false;
+                            config.ShowCloseIcon = true;
+                            config.VisibleStateDuration = 5000;
+                        });
+        }
+    }
+
+    [JSInvokable]
+    public async Task ShowUpdateAvailable()
+    {
+        await InvokeAsync(() =>
+        {
+            showUpdatePrompt = true;
+            StateHasChanged();
+        });
+    }
+
+    [JSInvokable]
+    public async Task ShowSyncComplete(string message)
+    {
+        await InvokeAsync(() =>
+        {
+            Snackbar.Add($"✅ {message}", Severity.Success);
+        });
+    }
+
+    [JSInvokable]
+    public async Task OnConnectivityChanged(bool online)
+    {
+        await InvokeAsync(() =>
+        {
+            if (online && !isOnline)
+            {
+                // Voltou a ficar online
+                Snackbar.Add("Conectado! Sincronizando dados...", Severity.Success);
+                _ = PWAService.SyncOfflineDataAsync();
+            }
+            else if (!online && isOnline)
+            {
+                // Ficou offline
+                Snackbar.Add("Você está offline. Os dados serão salvos localmente.", Severity.Warning);
+            }
+            
+            isOnline = online;
+            StateHasChanged();
+        });
+    }
+
+    private async Task AcceptUpdate()
+    {
+        showUpdatePrompt = false;
+        StateHasChanged();
+        
+        try
+        {
+            await JS.InvokeVoidAsync("location.reload");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao atualizar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void DismissUpdate()
+    {
+        showUpdatePrompt = false;
+        StateHasChanged();
+    }
+
+    private async Task InstallPWA()
+    {
+        try
+        {
+            await PWAService.InstallPWAAsync();
+            showInstallPrompt = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao instalar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+}

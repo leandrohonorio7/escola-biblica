@@ -1,0 +1,6 @@
+<!-- Placeholder for 192x192 icon -->
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="20" fill="#1976D2"/>
+  <path d="M96 32C76.8 32 61.6 47.2 61.6 66.4V96H41.6C38.4 96 36 98.4 36 101.6V156C36 159.2 38.4 161.6 41.6 161.6H150.4C153.6 161.6 156 159.2 156 156V101.6C156 98.4 153.6 96 150.4 96H130.4V66.4C130.4 47.2 115.2 32 96 32ZM96 45.6C108 45.6 116.8 54.4 116.8 66.4V96H75.2V66.4C75.2 54.4 84 45.6 96 45.6ZM96 116C102.4 116 107.2 120.8 107.2 127.2C107.2 130.4 106 133.2 104 135.2L108.8 148H83.2L88 135.2C86 133.2 84.8 130.4 84.8 127.2C84.8 120.8 89.6 116 96 116Z" fill="white"/>
+  <text x="96" y="180" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="white">ESCOLA BÍBLICA</text>
+</svg>

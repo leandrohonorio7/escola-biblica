@@ -1,0 +1,343 @@
+@page "/"
+@page "/dashboard"
+@using EscolaBiblica.BlazorWASM.Services
+@using EscolaBiblica.BlazorWASM.Models
+@inject IApiService ApiService
+@inject ICacheService CacheService
+@inject IAuthService AuthService
+@attribute [Authorize]
+
+<PageTitle>Dashboard - Escola Bíblica</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
+        Dashboard
+    </MudText>
+
+    @if (isLoading)
+    {
+        <MudGrid>
+            <MudItem xs="12">
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+                <MudText Align="Align.Center">Carregando informações...</MudText>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <!-- Cards de Resumo -->
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="mud-height-full">
+                    <MudCardContent>
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.h4" Color="Color.Primary">@totalAlunos</MudText>
+                                <MudText Typo="Typo.body2">Alunos</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" Size="Size.Large" />
+                        </div>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton StartIcon="@Icons.Material.Filled.Visibility" Color="Color.Primary" Href="/alunos">
+                            Ver Alunos
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="mud-height-full">
+                    <MudCardContent>
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.h4" Color="Color.Secondary">@totalTurmas</MudText>
+                                <MudText Typo="Typo.body2">Turmas</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.Class" Color="Color.Secondary" Size="Size.Large" />
+                        </div>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton StartIcon="@Icons.Material.Filled.Visibility" Color="Color.Secondary" Href="/turmas">
+                            Ver Turmas
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="mud-height-full">
+                    <MudCardContent>
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.h4" Color="Color.Success">@percentualPresencaHoje.ToString("F1")%</MudText>
+                                <MudText Typo="Typo.body2">Presença Hoje</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+                        </div>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton StartIcon="@Icons.Material.Filled.Visibility" Color="Color.Success" Href="/presencas">
+                            Ver Presenças
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="mud-height-full">
+                    <MudCardContent>
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.h4" Color="Color.Tertiary">@totalCompeticoes</MudText>
+                                <MudText Typo="Typo.body2">Competições Ativas</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Color="Color.Tertiary" Size="Size.Large" />
+                        </div>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton StartIcon="@Icons.Material.Filled.Visibility" Color="Color.Tertiary" Href="/competicoes">
+                            Ver Competições
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Gráficos e Informações Principais -->
+        <MudGrid>
+            <!-- Gráfico de Presença da Semana -->
+            <MudItem xs="12" md="8">
+                <MudCard Class="mud-height-full">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Presença da Semana</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Default" />
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (presencaSemana?.Any() == true)
+                        {
+                            <MudChart ChartType="ChartType.Line"
+                                      ChartSeries="@presencaChartData"
+                                      XAxisLabels="@diasSemana.ToArray()"
+                                      Width="100%"
+                                      Height="300px" />
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info">
+                                Dados de presença não disponíveis para esta semana.
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Top Alunos -->
+            <MudItem xs="12" md="4">
+                <MudCard Class="mud-height-full">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Top Alunos (Presença)</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (topAlunos?.Any() == true)
+                        {
+                            @foreach (var aluno in topAlunos.Take(5))
+                            {
+                                <div class="d-flex justify-space-between align-center mb-3">
+                                    <div>
+                                        <MudText Typo="Typo.body1">@aluno.Nome</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@aluno.NomeTurma</MudText>
+                                    </div>
+                                    <MudChip Color="Color.Success" Size="Size.Small" T="string">
+                                        @aluno.PercentualPresenca.ToString("F1")%
+                                    </MudChip>
+                                </div>
+                                <MudDivider />
+                            }
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mt-2">
+                                Nenhum aluno encontrado.
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Color="Color.Primary" Href="/ranking">Ver Ranking Completo</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Ações Rápidas -->
+        <MudGrid Class="mt-6">
+            <MudItem xs="12">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Ações Rápidas</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudStack Row Spacing="4" Justify="Justify.SpaceEvenly" Class="pa-4">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                                       Size="Size.Large"
+                                       Href="/alunos/novo">
+                                Novo Aluno
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Secondary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       Size="Size.Large"
+                                       Href="/turmas/nova">
+                                Nova Turma
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.CheckBox"
+                                       Size="Size.Large"
+                                       Href="/presencas/registrar">
+                                Registrar Presença
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Tertiary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       Size="Size.Large"
+                                       Href="/competicoes/nova">
+                                Nova Competição
+                            </MudButton>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private bool isLoading = true;
+    private int totalAlunos = 0;
+    private int totalTurmas = 0;
+    private decimal percentualPresencaHoje = 0;
+    private int totalCompeticoes = 0;
+    
+    private List<AlunoDto>? topAlunos;
+    private List<PresencaDto>? presencaSemana;
+    
+    private List<ChartSeries> presencaChartData = new();
+    private List<string> diasSemana = new() { "Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Carregar dados do dashboard em paralelo
+            var tasks = new List<Task>
+            {
+                CarregarEstatisticas(),
+                CarregarTopAlunos(),
+                CarregarPresencaSemana()
+            };
+
+            await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            // Log error
+            Console.WriteLine($"Erro ao carregar dados do dashboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CarregarEstatisticas()
+    {
+        // Carregar estatísticas básicas
+        var alunos = await CacheService.GetOrSetAsync(
+            "dashboard_alunos", 
+            () => ApiService.GetAsync<List<AlunoDto>>("api/alunos"),
+            TimeSpan.FromMinutes(5)
+        );
+
+        var turmas = await CacheService.GetOrSetAsync(
+            "dashboard_turmas",
+            () => ApiService.GetAsync<List<TurmaDto>>("api/turmas"),
+            TimeSpan.FromMinutes(5)
+        );
+
+        totalAlunos = alunos?.Count(a => a.Ativo) ?? 0;
+        totalTurmas = turmas?.Count(t => t.Ativo) ?? 0;
+
+        // Calcular presença de hoje
+        var hoje = DateTime.Today;
+        var presencasHoje = await ApiService.GetAsync<List<PresencaDto>>($"api/presencas?data={hoje:yyyy-MM-dd}");
+        
+        if (presencasHoje?.Any() == true && totalAlunos > 0)
+        {
+            var presentes = presencasHoje.Count(p => p.Presente);
+            percentualPresencaHoje = (decimal)presentes / totalAlunos * 100;
+        }
+    }
+
+    private async Task CarregarTopAlunos()
+    {
+        topAlunos = await CacheService.GetOrSetAsync(
+            "dashboard_top_alunos",
+            () => ApiService.GetAsync<List<AlunoDto>>("api/alunos/ranking?limit=10"),
+            TimeSpan.FromMinutes(10)
+        );
+    }
+
+    private async Task CarregarPresencaSemana()
+    {
+        var inicioSemana = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+        presencaSemana = await ApiService.GetAsync<List<PresencaDto>>($"api/presencas/semana?inicio={inicioSemana:yyyy-MM-dd}");
+
+        if (presencaSemana?.Any() == true)
+        {
+            // Agrupar por dia da semana e calcular percentual
+            var dadosPorDia = presencaSemana
+                .GroupBy(p => p.DataAula.DayOfWeek)
+                .ToDictionary(g => g.Key, g => g.Count(p => p.Presente) * 100.0 / g.Count());
+
+            var valores = new List<double>();
+            for (int i = 0; i < 7; i++)
+            {
+                var diaSemana = (DayOfWeek)i;
+                valores.Add(dadosPorDia.GetValueOrDefault(diaSemana, 0));
+            }
+
+            presencaChartData = new List<ChartSeries>
+            {
+                new ChartSeries
+                {
+                    Name = "Presença (%)",
+                    Data = valores.ToArray()
+                }
+            };
+        }
+    }
+}

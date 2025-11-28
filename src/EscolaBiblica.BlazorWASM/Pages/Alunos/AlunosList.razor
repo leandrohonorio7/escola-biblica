@@ -1,0 +1,376 @@
+@page "/alunos"
+@using EscolaBiblica.BlazorWASM.Services
+@using EscolaBiblica.BlazorWASM.Models
+@inject IApiService ApiService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Alunos - Escola Bíblica</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+            Alunos
+        </MudText>
+        
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="@(() => Navigation.NavigateTo("/alunos/novo"))">
+            Novo Aluno
+        </MudButton>
+    </div>
+
+    <!-- Filtros -->
+    <MudCard Class="mb-4">
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudTextField @bind-Value="filtroNome"
+                                  Label="Buscar por nome"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  OnKeyUp="@(async () => await FiltrarAlunos())" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect @bind-Value="filtroTurma"
+                               Label="Turma"
+                               Variant="Variant.Outlined"
+                               Clearable="true"
+                               SelectedValueChanged="@(async (Guid? value) => { filtroTurma = value; await FiltrarAlunos(); })">
+                        @if (turmas != null)
+                        {
+                            @foreach (var turma in turmas)
+                            {
+                                <MudSelectItem Value="@turma.Id">@turma.Nome</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect @bind-Value="filtroStatus"
+                               Label="Status"
+                               Variant="Variant.Outlined"
+                               SelectedValueChanged="@(async (string value) => { filtroStatus = value; await FiltrarAlunos(); })">
+                        <MudSelectItem Value="@("todos")">Todos</MudSelectItem>
+                        <MudSelectItem Value="@("ativo")">Ativos</MudSelectItem>
+                        <MudSelectItem Value="@("inativo")">Inativos</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3" Class="d-flex align-center">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.Clear"
+                               OnClick="LimparFiltros">
+                        Limpar
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Tabela de Alunos -->
+    <MudCard>
+        <MudCardContent Class="pa-0">
+            @if (isLoading)
+            {
+                <div class="d-flex justify-center pa-4">
+                    <MudProgressCircular Indeterminate="true" />
+                </div>
+            }
+            else if (alunosFiltrados?.Any() == true)
+            {
+                <MudDataGrid Items="@alunosFiltrados"
+                             Filterable="false"
+                             SortMode="SortMode.Multiple"
+                             Groupable="false"
+                             T="AlunoDto"
+                             Elevation="0"
+                             Class="mud-data-grid-custom">
+                    
+                    <Columns>
+                        <PropertyColumn Property="x => x.Nome" Title="Nome" Sortable="true">
+                            <CellTemplate>
+                                <div class="d-flex align-center">
+                                    <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-3">
+                                        @context.Item.Nome.FirstOrDefault()
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.body1">@context.Item.Nome</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @(DateTime.Today.Year - context.Item.DataNascimento.Year) anos
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </CellTemplate>
+                        </PropertyColumn>
+
+                        <PropertyColumn Property="x => x.NomeTurma" Title="Turma" Sortable="true">
+                            <CellTemplate>
+                                @if (!string.IsNullOrEmpty(context.Item.NomeTurma))
+                                {
+                                    <MudChip Color="Color.Info" Size="Size.Small">@context.Item.NomeTurma</MudChip>
+                                }
+                                else
+                                {
+                                    <MudText Color="Color.Secondary">Sem turma</MudText>
+                                }
+                            </CellTemplate>
+                        </PropertyColumn>
+
+                        <PropertyColumn Property="x => x.Email" Title="E-mail" Sortable="true">
+                            <CellTemplate>
+                                @if (!string.IsNullOrEmpty(context.Item.Email))
+                                {
+                                    <MudText>@context.Item.Email</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Color="Color.Secondary">-</MudText>
+                                }
+                            </CellTemplate>
+                        </PropertyColumn>
+
+                        <PropertyColumn Property="x => x.Telefone" Title="Telefone" Sortable="false">
+                            <CellTemplate>
+                                @if (!string.IsNullOrEmpty(context.Item.Telefone))
+                                {
+                                    <MudText>@context.Item.Telefone</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Color="Color.Secondary">-</MudText>
+                                }
+                            </CellTemplate>
+                        </PropertyColumn>
+
+                        <PropertyColumn Property="x => x.PercentualPresenca" Title="Presença" Sortable="true">
+                            <CellTemplate>
+                                <div class="d-flex align-center">
+                                    <MudProgressLinear Color="@GetPresencaColor(context.Item.PercentualPresenca)"
+                                                       Value="@((double)context.Item.PercentualPresenca)"
+                                                       Class="mr-2"
+                                                       Style="width: 60px;" />
+                                    <MudText Typo="Typo.caption">
+                                        @context.Item.PercentualPresenca.ToString("F1")%
+                                    </MudText>
+                                </div>
+                            </CellTemplate>
+                        </PropertyColumn>
+
+                        <PropertyColumn Property="x => x.Ativo" Title="Status" Sortable="true">
+                            <CellTemplate>
+                                <MudChip Color="@(context.Item.Ativo ? Color.Success : Color.Default)"
+                                         Size="Size.Small">
+                                    @(context.Item.Ativo ? "Ativo" : "Inativo")
+                                </MudChip>
+                            </CellTemplate>
+                        </PropertyColumn>
+
+                        <TemplateColumn CellClass="d-flex justify-end" Sortable="false" Title="Ações">
+                            <CellTemplate>
+                                <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                                    <MudTooltip Text="Visualizar">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                                       Color="Color.Primary"
+                                                       OnClick="@(() => VisualizarAluno(context.Item))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Editar">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Color="Color.Secondary"
+                                                       OnClick="@(() => EditarAluno(context.Item))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Registrar Presença">
+                                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle"
+                                                       Color="Color.Success"
+                                                       OnClick="@(() => RegistrarPresenca(context.Item))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Excluir">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Color="Color.Error"
+                                                       OnClick="@(() => ExcluirAluno(context.Item))" />
+                                    </MudTooltip>
+                                </MudButtonGroup>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+
+                    <PagerContent>
+                        <MudDataGridPager T="AlunoDto" />
+                    </PagerContent>
+                </MudDataGrid>
+            }
+            else
+            {
+                <div class="d-flex flex-column align-center justify-center pa-8">
+                    <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-2">
+                        Nenhum aluno encontrado
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                        @if (HasFiltrosAtivos())
+                        {
+                            <span>Tente alterar os filtros ou adicionar um novo aluno.</span>
+                        }
+                        else
+                        {
+                            <span>Comece adicionando o primeiro aluno à escola bíblica.</span>
+                        }
+                    </MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PersonAdd"
+                               OnClick="@(() => Navigation.NavigateTo("/alunos/novo"))"
+                               Class="mt-4">
+                        Adicionar Primeiro Aluno
+                    </MudButton>
+                </div>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private List<AlunoDto>? alunos;
+    private List<AlunoDto>? alunosFiltrados;
+    private List<TurmaDto>? turmas;
+    private bool isLoading = true;
+
+    // Filtros
+    private string filtroNome = string.Empty;
+    private Guid? filtroTurma = null;
+    private string filtroStatus = "todos";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            var alunosTask = ApiService.GetAsync<List<AlunoDto>>("api/alunos");
+            var turmasTask = ApiService.GetAsync<List<TurmaDto>>("api/turmas");
+
+            alunos = await alunosTask;
+            turmas = await turmasTask;
+
+            await FiltrarAlunos();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar alunos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task FiltrarAlunos()
+    {
+        await Task.Delay(1); // Para evitar problemas de sincronização
+
+        if (alunos == null)
+        {
+            alunosFiltrados = null;
+            return;
+        }
+
+        alunosFiltrados = alunos.Where(a =>
+        {
+            // Filtro por nome
+            if (!string.IsNullOrWhiteSpace(filtroNome) &&
+                !a.Nome.Contains(filtroNome, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            // Filtro por turma
+            if (filtroTurma.HasValue && a.TurmaId != filtroTurma.Value)
+                return false;
+
+            // Filtro por status
+            if (filtroStatus == "ativo" && !a.Ativo)
+                return false;
+            if (filtroStatus == "inativo" && a.Ativo)
+                return false;
+
+            return true;
+        }).ToList();
+
+        StateHasChanged();
+    }
+
+    private void LimparFiltros()
+    {
+        filtroNome = string.Empty;
+        filtroTurma = null;
+        filtroStatus = "todos";
+        _ = FiltrarAlunos();
+    }
+
+    private bool HasFiltrosAtivos()
+    {
+        return !string.IsNullOrWhiteSpace(filtroNome) ||
+               filtroTurma.HasValue ||
+               filtroStatus != "todos";
+    }
+
+    private Color GetPresencaColor(decimal percentual)
+    {
+        if (percentual >= 80) return Color.Success;
+        if (percentual >= 60) return Color.Warning;
+        return Color.Error;
+    }
+
+    private void VisualizarAluno(AlunoDto aluno)
+    {
+        Navigation.NavigateTo($"/alunos/{aluno.Id}");
+    }
+
+    private void EditarAluno(AlunoDto aluno)
+    {
+        Navigation.NavigateTo($"/alunos/{aluno.Id}/editar");
+    }
+
+    private void RegistrarPresenca(AlunoDto aluno)
+    {
+        Navigation.NavigateTo($"/presencas/registrar?aluno={aluno.Id}");
+    }
+
+    private async Task ExcluirAluno(AlunoDto aluno)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Tem certeza que deseja excluir o aluno '{aluno.Nome}'? Esta ação não pode ser desfeita.",
+            ["ButtonText"] = "Excluir",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar Exclusão", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/alunos/{aluno.Id}");
+                Snackbar.Add($"Aluno '{aluno.Nome}' excluído com sucesso!", Severity.Success);
+                await CarregarDados();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir aluno: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
